@@ -1,0 +1,113 @@
+---
+title: "Homework6 - Group 6"
+author: "Shahzad Anasari, Jordan Daugherty and Karen Ochie"
+date: "10/18/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+tinytex::install_tinytex()
+library(latexpdf)
+library(pls)
+library(lars)
+library(car)
+library(MASS)
+library(caret)
+library(tidyverse)
+library(outliers)
+library(mice)
+library(hydroGOF)
+library(e1071)
+library(glmnet)
+library(ggdark)
+
+traindata = read.csv("Train.csv")
+summary(traindata)
+```
+
+**Learning Objective:** Data wrangling, regression modeling and analysis
+
+**Problem 1 - Online Retail Sales Prediction**
+
+*(a) Data Preparation and Modeling*
+
+i. Data Understanding
+```{r, fig.width=14, fig.height=8, include=TRUE}
+traindata <- traindata%>%
+  mutate(operatingSystem=fct_reorder(operatingSystem,revenue,.desc=T))
+ggplot(data=traindata, aes(y=revenue, x=operatingSystem))+
+  geom_point()+
+  xlab("Operating Sysem")+
+  ylab("Revenue")+
+  labs(title="Figure 1: Revenue vs Operating System")+
+  dark_theme_bw()
+
+```
+Figure 1 illustrates the relationship between different operating systems used and the amount of revenue gained from each operating system. We can take away some good information from this graph that can help us predict future revenue based on what operating system was used. 
+``` {r, fig.width=14, include=TRUE}
+ggplot(data=traindata, aes(y=revenue, x=subContinent))+
+  geom_point(aes(color=channelGrouping))+
+  labs(x="Sub-Continent",y="Revenue",title="Figure 2: Revenue vs. Sub-Continent",size=10)+
+  scale_colour_discrete("Channel\nGrouping")+
+  dark_theme_light()+
+  theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1))
+```
+Figure 2 gives us information from a different angle, showing us the amount of revenue gained based on the continent the user is from. Channel grouping was also added to show what category was used by the user.
+
+Overall, we can learn a lot about what different factors have high influences on the amount of revenue gained by a customer. From Figure 1, we can see that a majority of revenue is gained when the operating systems Macintosh, Chrome, Windows and Android are used. Figure 2 illustrates that Northern America is by far the sub-continent with the most revenue gained. The channel grouping also provides us with more incite on which channel groupings are used more frequently for purchases. 
+
+ii. Data Preparation
+```{r, include=TRUE}
+#Summary of Data
+traindata = read.csv("Train.csv")
+#AddsSum total revenue per customer Id
+traindata <- traindata %>%
+  group_by(custId) %>%
+  mutate(custRev = sum(revenue))
+
+#Add target revenue per customer Id 
+traindata <- traindata %>%
+  group_by(custId) %>%
+  mutate(targetRev = log(custRev + 1))
+```
+```{r, include=FALSE}
+is.numeric(traindata$custRev)
+is.numeric(traindata$targetRev)
+
+#Split numeric and factorial data
+traindata_numeric <-traindata %>% 
+  select_if(is.numeric)
+
+traindata <-traindata %>% 
+   mutate_if(is.character,as.factor)
+
+boxplot(traindata$targetRev~traindata$channelGrouping)
+summary(traindata_numeric)
+
+#NA's: adwordsClickInfo.page, adwordsClickInfo.isVideoAd, bounces and newVisits
+
+traindata_numeric.imp <- traindata_numeric[,c("pageviews","revenue")]
+missing <- is.na(traindata_numeric.imp$pageviews)
+traindata_numeric.imp$missing <- missing
+
+traindata_numeric.imp[missing,"pageviews"] <- mice.impute.pmm(
+  traindata_numeric.imp$pageviews,
+  !traindata_numeric.imp$missing, 
+  traindata_numeric.imp$revenue)
+
+traindata_numeric$pageviews<-traindata_numeric.imp$pageviews
+
+traindata <- select(traindata,-adwordsClickInfo.adNetworkType)
+
+model1<-lm(data=traindata, targetRev~source+medium+date+channelGrouping+visitStartTime+visitNumber+
+             timeSinceLastVisit+browser+operatingSystem+isMobile+deviceCategory+continent+subContinent+
+             country+region+metro+city)
+summary(model1)
+
+model2<-lm(data=traindata_numeric, targetRev~.)
+summary(model2)
+
+```
