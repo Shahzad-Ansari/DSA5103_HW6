@@ -255,6 +255,7 @@ str(training_data)
 t1 = training_data %>%  
   mutate(subContinent = fct_lump(as.factor(subContinent),n=5)) %>%
   mutate(browser = fct_lump(as.factor(browser),n=8)) %>%
+  mutate(country = fct_lump(as.factor(country),n=8))%>%
   mutate(operatingSystem = fct_lump(as.factor(operatingSystem),n=6)) %>% 
   group_by(custId) %>%
   dplyr::summarise(n = n(),
@@ -265,6 +266,8 @@ t1 = training_data %>%
                    ,subContinent = getmode(subContinent)
                    ,browser = getmode(browser)
                    ,operatingSystem = getmode(operatingSystem)
+                   ,country = getmode(country)
+                   
                    
                    
 
@@ -273,6 +276,7 @@ t1 = training_data %>%
 t2 = testing_data %>%  
   mutate(subContinent = fct_lump(as.factor(subContinent),n=5)) %>%
   mutate(browser = fct_lump(as.factor(browser),n=8)) %>%
+  mutate(country = fct_lump(as.factor(country),n=8))%>%
   mutate(operatingSystem = fct_lump(as.factor(operatingSystem),n=6)) %>% 
   group_by(custId) %>%
   dplyr::summarise(n = n(),
@@ -282,6 +286,7 @@ t2 = testing_data %>%
                    ,subContinent = getmode(subContinent)
                    ,browser = getmode(browser)
                    ,operatingSystem = getmode(operatingSystem)
+                   ,country = getmode(country)
                    
                    
   )
