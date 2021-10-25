@@ -43,6 +43,10 @@ library(factoextra)
 library(Hmisc)
 library(fastDummies)
 library(outliers)
+library(e1071)
+library(hydroGOF)
+library(ggdark)
+library(lars)
 
 training_data = data.frame(read.csv(file = "Train.csv", stringsAsFactors = TRUE)) %>% mutate_all(na_if,"")
 testing_data = data.frame(read.csv(file = "Test.csv", stringsAsFactors = TRUE)) %>% mutate_all(na_if,"")
@@ -312,6 +316,7 @@ t2 = testing_data %>%
 t2$subContinent[is.na(t2$subContinent)] = as.factor("Other")
 t2$browser[is.na(t2$browser)] = as.factor("Other")
 t2$operatingSystem[is.na(t2$operatingSystem)] = as.factor("Other")
+t2$country[is.na(t2$country)] = as.factor("Other")
 
 table(t2$subContinent)
 table(t1$subContinent)
@@ -346,6 +351,8 @@ fit_ols <- train(data=t1, log(totalRevenue + 1) ~ .-custId,
                  trControl = fitControl,
                  na.action = na.pass)
 fit_ols
+OLS_RMSE <- fit_ols$results$RMSE
+OLS_R2 <- fit_ols$results$Rsquared
 
 pred<-predict(fit_ols,newdata=t2,na.action = na.pass)
 pred
@@ -357,7 +364,7 @@ write.csv(submissionDf1, "submission2.csv", row.names=FALSE)
 
 ```
 
-```{r}
+```{r, include=FALSE}
 
 ###############################################################################
 #                                   PLS MODEL                                 #
@@ -372,29 +379,34 @@ fit_pls <- train(data=t1, log(totalRevenue + 1) ~ .-custId,
 fit_pls
 
 pred<-predict(fit_pls,newdata=t2,na.action = na.pass)
-pred
 
-model3 <- plsr(log(totalRevenue+1)~.-custId,data=t1,validation="CV",scale=TRUE,method="oscorespls")
+PLS_model <- plsr(log(totalRevenue+1)~.-custId,30,data=t1,validation="CV",scale=TRUE,method="oscorespls")
 
-sqrt(mean((model3$fitted.values-log(t1$totalRevenue+1))^2))
+PLS_RMSE<-sqrt(mean((PLS_model$fitted.values-log(t1$totalRevenue+1))^2))
+PLS_RMSE
+
+PLS_R2<-mean(R2(PLS_model,"CV",intercept = FALSE)$val[,,])
+PLS_R2
 
 pred_pls <- predict(model3,newdata=t2)
 pred_pls
 
-control <- trainControl(method = "repeatedcv",
-                        number = 20,
-                        repeats = 5,
-                        search = "random",
-                        verboseIter = TRUE)
 ```
 
-```{r}
+```{r, indluce=FALSE}
 
 ###############################################################################
 #                           ELASTIC NET MODEL                                 #
 ###############################################################################
 
 #TRAINING ELASTIC NET REGRESSION MODEL
+
+control <- trainControl(method = "repeatedcv",
+                        number = 5,
+                        repeats = 5,
+                        search = "random",
+                        verboseIter = TRUE)
+
 elastic_model <- train(data=t1,log(totalRevenue + 1) ~ .-custId,
                        method = "glmnet",
                        na.action = na.pass,
@@ -402,14 +414,35 @@ elastic_model <- train(data=t1,log(totalRevenue + 1) ~ .-custId,
                        tuneLength = 10,
                        trControl = control)
 
-elastic_model$results
+ELASTIC_RMSE<-min(elastic_model$results$RMSE)
+ELASTIC_R2 <- elastic_model$results$Rsquared[2]
 
 pred_elastic <- predict(elastic_model,newdata=t2)
-
-
-```
 ```
 
+```{r, include=FALSE}
+###############################################################################
+#                               SVM MODEL                                     #
+###############################################################################
+SVM_model=svm(data=t1,log(totalRevenue + 1) ~ .-custId, na.action=na.pass,type="eps-regression")
 
+pred_svm = predict(SVM_model,newdata=t2,na.action=na.pass)
+#Find RMSE
+SVM_RMSE <- sqrt(mean((SVM_model$fitted-log(t1$totalRevenue+1))^2))
+summary(SVM_model)
+
+pred_svm = predict(SVM_model,newdata=t2,na.action=na.pass)
+
+submissionDf3 <- data.frame(custId=t2$custId, predRevenue=pred_svm)
+#create csv file for uploading to kaggle
+write.csv(submissionDf3, "submission3.csv", row.names=FALSE)
+
+```
+
+```{r}
+
+summary_data <- data.frame(Model=c("OLS","PLS","elasticNet","SVM"),Method=c("lm","plsr","glmnet","svm"),Package=c("stats","pls","caret","e1071"),Hyperparameter=c("NA","ncomp",0,"cost, gamma, epsilon"),Value=c("NA",31,0,"1,0.03125,0.1"),CV_RMSE=c(OLS_RMSE,PLS_RMSE,ELASTIC_RMSE,SVM_RMSE),CV_R2=c(OLS_R2,PLS_R2,ELASTIC_R2,0))
+
+summary_data
 
 ```
