@@ -72,7 +72,8 @@ Figure 1 illustrates the relationship between different operating systems used a
 ``` {r, fig.width=14, include=TRUE}
 ggplot(data=training_data, aes(y=revenue, x=subContinent))+
   geom_point(aes(color=channelGrouping))+
-  labs(x="Sub-Continent",y="Customer Revenue",title="Figure 2: Revenue vs. Sub-Continent",size=10)+
+  labs(x="Sub-Continent",y="Customer Revenue",title="Figure 2: Revenue vs. Sub-Continent",
+       size=10)+
   scale_colour_discrete("Channel\nGrouping")+
   dark_theme_light()+
   theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1))
@@ -93,7 +94,8 @@ names(percentagesDf)[1] = "Column_Name"
 names(percentagesDf)[2] = "Missing_Percentage"
 percentagesDf = as.data.frame(percentagesDf)
 
-ggplot(data = percentagesDf, mapping = aes(x = reorder(Column_Name, -Missing_Percentage), Missing_Percentage)) + 
+ggplot(data = percentagesDf, mapping = aes(x = reorder(Column_Name, -Missing_Percentage),
+                                           Missing_Percentage)) + 
   geom_bar(stat = "identity",aes(fill=Missing_Percentage), position = 'dodge') + 
   coord_flip()+
   geom_label(aes(label = Missing_Percentage,fill=Missing_Percentage),color = "Red")+
@@ -111,15 +113,16 @@ names(percentagesDf)[1] = "Column_Name"
 names(percentagesDf)[2] = "Missing_Percentage"
 percentagesDf = as.data.frame(percentagesDf)
 
-ggplot(data = percentagesDf, mapping = aes(x = reorder(Column_Name, -Missing_Percentage), Missing_Percentage)) + 
-  geom_bar(stat = "identity",aes(fill=Missing_Percentage), position = 'dodge') + 
-  coord_flip()+
-  geom_label(aes(label = Missing_Percentage,fill=Missing_Percentage),color = "Red")+
-  xlab("Column Name")+
-  ylab("Missing Percentage")+
-  ggtitle("Testing Data Missing Percentage")
 ```
 
+*Data Preparation*
+
+1. factor selection
+After visualizing the data set and seeing how much of each factor contains NA values, we began to select which we would keep. As a general rule any factor containing over 20
+percent of the missing information we determined to be not worth imputing as any imputation methods we would use may be inaccurate or in some cases, it would be impossible to create
+an accurate imputation i.e city. There would be no way for us to know which city they originated from nor what metro etc. We also removed information that we determined to be
+of little value such as bounces, sessionId,visitStartTime, and date. There would be no real meaningful information gained from knowing what time a session started and modeling
+confirmed that some of these factors were not of high value.
 ```{r, include=FALSE}
 
 sum(is.na(training_data$country))
@@ -166,6 +169,21 @@ testing_data = dplyr::select(testing_data,-c(adwordsClickInfo.isVideoAd,
                                              date
 ))
 ```
+
+2. Imputations
+Once we have decided on which factors are worth keeping we need to then impute the missing values in those factors. Many of the factors were categorical in nature meaning any
+numerical method used to impute such as mean value imputation would be out of the question. For the categorical variables such as operating system, browser and medium the imputation
+method used was a probabilistic method. Taking the occurrences of each category within the column you could create a probability distribution. When an NA is encountered randomly generate
+a value using the probability distributions to select which of the existing categories will be used to impute the NA. For NewVisits and pageViews a more numerical method could
+be used, since there was no way of knowing if a visit was a new visit we would just assume it wasn't a new visit. For the page views, we would determine the average page views using mean
+value imputation and rounding down. Within the location data country, continent and subcontinent there were 84 values in which all 3 were unknown, since there was no possible way to know
+what these three could be a new level was added called unknown and they have imputed it as such.
+
+3. factor collapsing
+Before any modeling is done we need to deal with the fact that some categories have too many levels. subContinent, country, browser, country, and operatingSystem all have many
+levels and some of these levels may only have a few entries. For the Subcontinent continents and countries, we determined that over 50 percent of entries come from the united states,
+using factor lump we consolidated the categorical columns into two levels each. The North American Continent, the north subcontinent, and the United States. The levels for browser
+were reduced to the top 8 levels and 1 other level and the operating system column was lumped into the top 6 levels and one other level.
 ```{r, include=FALSE}
 ###############################################################################
 #                                   IMPUTE                                    #
@@ -245,6 +263,9 @@ percentagesDf
 ###############################################################################
 ```
 
+4. Outlier Resolution
+
+After the initial data analysis, the revenue variable has a very significant outlier. This outlier was a value of 15980.79 and came from one single customer Id. This customer visited the site 6 times, but only made a purchase one time. In order to avoid the prediction model being skewed, the outlier was removed.
 ```{r, include=FALSE}
 ###############################################################################
 #                            OUTLIER RESOLUTION                               # 
@@ -262,7 +283,9 @@ training_data = training_data[training_data$revenue < 15980.79,]
 #                       END OF OUTLIER RESOLUTION                             # 
 ###############################################################################
 ```
+5. Data Aggregation
 
+After the initial data preparation, the training and testing data was aggregated to summarize the parameter variables and modify the output variable to the natural log of the total revenue plus one for each customer Id. The summarized parameters include the average page views, the maximum number of visits, the average visit gap time and the mode for the browser, operatingSystem, country and subContinent. 
 ```{r, include=FALSE}
 ###############################################################################
 #                             AGGREGATION                                     #
@@ -290,10 +313,6 @@ t1 = training_data %>%
                    ,browser = getmode(browser)
                    ,operatingSystem = getmode(operatingSystem)
                    ,country = getmode(country)
-                   
-                   
-                   
-                   
   )
 
 t2 = testing_data %>%  
@@ -310,8 +329,6 @@ t2 = testing_data %>%
                    ,browser = getmode(browser)
                    ,operatingSystem = getmode(operatingSystem)
                    ,country = getmode(country)
-                   
-                   
   )
 t2$subContinent[is.na(t2$subContinent)] = as.factor("Other")
 t2$browser[is.na(t2$browser)] = as.factor("Other")
@@ -325,8 +342,12 @@ table(t1$subContinent)
 #                           END AGGREGATION                                  #
 ###############################################################################
 ```
+*OLS Model*
+
+Initially we tried the linear model from the stats package as a first attempt. This did not produce a very good RMSE value. The caret package train function was then tested with a K-fold cross validation re-sampling approach was also implemented. For the K-fold CV a fold value of 20 and a k value of 5 was used. This produced a better RMSE value. 
 
 ```{r, include=FALSE}
+
 
 ###############################################################################
 #                                   OLS MODEL                                 #
@@ -335,6 +356,8 @@ table(t1$subContinent)
 tempFit <- lm(data=t1, log(totalRevenue + 1) ~ .-custId)
 summary(tempFit)
 
+model2 <- step(tempFit,direction="backward")
+summary(model2)
 
 sqrt(mean((tempFit$fitted.values-log(t1$totalRevenue+1))^2))
 
@@ -345,7 +368,7 @@ write.csv(out1,"out2.csv", row.names = FALSE)
 sum(is.na(out1))
 
 fitControl <- trainControl(method="repeatedcv",number=20, repeats = 5)
-lassoGrid <- expand.grid(fraction=seq(0.1,0.99,length=100))
+
 fit_ols <- train(data=t1, log(totalRevenue + 1) ~ .-custId,
                  method="lm",
                  trControl = fitControl,
@@ -360,9 +383,12 @@ dim(pred)
 
 submissionDf1 <- data.frame(custId=t2$custId, predRevenue=pred)
 #create csv file for uploading to kaggle
-write.csv(submissionDf1, "submission2.csv", row.names=FALSE)
+#write.csv(submissionDf1, "submission2.csv", row.names=FALSE)
 
 ```
+*PLS Model*
+
+A PLS model was then developed from the caret package using the train function with the pls method. This model also used K-fold cross validation re-sampling approach with the same fold=20 and k=5 from the OLS train model and produced an RMSE that was worse than our OLS model. From there, the pls package was tested to compare similar models from different packages would perform. The oscorespls method was used for this model, with a ncomp of 30 and a cross validation approach. This model produced a similar value to the OLS model.
 
 ```{r, include=FALSE}
 
@@ -371,7 +397,6 @@ write.csv(submissionDf1, "submission2.csv", row.names=FALSE)
 ###############################################################################
 
 fitControl <- trainControl(method="repeatedcv",number=20, repeats = 5)
-lassoGrid <- expand.grid(fraction=seq(0.1,0.99,length=100))
 fit_pls <- train(data=t1, log(totalRevenue + 1) ~ .-custId,
                  method="pls",
                  trControl = fitControl,
@@ -388,10 +413,13 @@ PLS_RMSE
 PLS_R2<-mean(R2(PLS_model,"CV",intercept = FALSE)$val[,,])
 PLS_R2
 
-pred_pls <- predict(model3,newdata=t2)
+pred_pls <- predict(PLS_model,newdata=t2)
 pred_pls
 
 ```
+ *Elastic Net Model*
+ 
+ Here, two different caret package train methods were tested. The first a glmnet method with K-fold cross validation with 5 folds and k=5. This produced an RMSE of 0.937, which wasn't better than our OLS or our PLS models. Next, the enet method was tested on the Elastic Net model and along with a K-fold cross validation with 5 folds and a k-value of 10. This produced a significantly worse RMSE value of 1.02 with a lambda of 0.5 and a fraction of 0.3. 
 
 ```{r, indluce=FALSE}
 
@@ -414,11 +442,82 @@ elastic_model <- train(data=t1,log(totalRevenue + 1) ~ .-custId,
                        tuneLength = 10,
                        trControl = control)
 
+grid <- expand.grid(
+  lambda   = seq(0.5, 0.7, by=0.1),
+  fraction = seq(0, 1, by=0.1)
+)
+
+ctrl <- trainControl(
+  method     = 'repeatedcv',
+  number     = 5,  #folds
+  repeats    = 10, #repeats
+  classProbs = FALSE
+)
+
+
+enetTune <- train(data=t1, log(totalRevenue + 1) ~ .-custId,
+  method = 'enet',
+  metric = 'RMSE',
+  tuneGrid = grid,
+  trControl = ctrl
+)
+
+plot(elastic_model)
+
+elastic_model$bestTune
+
 ELASTIC_RMSE<-min(elastic_model$results$RMSE)
 ELASTIC_R2 <- elastic_model$results$Rsquared[2]
 
+
 pred_elastic <- predict(elastic_model,newdata=t2)
 ```
+*LASSO Model*
+
+Next, a LASSO model was tested with the caret package train function. Here a K-fold cross validation was used with 20 fold and a k-value of 5. A tune grid was also used to test 100 different fraction values. This model produced our an RMSE value better than the 3 previous model types tested. 
+```{r, include=FALSE}
+###############################################################################
+#                               LASSO MODEL                                   #
+###############################################################################
+lassoGrid <- expand.grid(fraction=seq(0.1,0.99,length=100))
+fit_lasso <- train(data=t1, log(totalRevenue + 1) ~ .-custId,
+                   method="lasso",
+                   trControl = fitControl,
+                   tuneGrid = lassoGrid,
+                   na.action = na.pass)
+
+fit_lasso
+
+LASSO_RMSE <- min(fit_lasso$results$RMSE)
+LASSO_R2 <- max(fit_lasso$results$Rsquared)
+```
+*Ridge Regression*
+
+Another model was then tested using the caret package train function with the glment method, a tune grid where multiple lambda values were tested, and K-fold cross validation was used with 5 folds and a k-value of 5. This model produced a RMSE that was better than the elastic net, but not better than any other model tested. 
+```{r, include=FALSE}
+###############################################################################
+#                        RIDGE REGRESSION MODEL                              #
+###############################################################################
+
+custom = trainControl(method = "repeatedcv", number = 5, verboseIter = T, repeats = 5)
+
+set.seed(1234)
+
+ridge <- train(data=t1, log(totalRevenue + 1) ~ .-custId,method ='glmnet',
+               tuneGrid = expand.grid(alpha = 0,lambda = seq(.0000,1,length=5 )),
+               trControl = custom)
+plot(ridge)
+print(ridge)
+plot(ridge$finalModel,xvar="lambda",label = T)
+plot(varImp(ridge,scale = T))
+
+RIDGE_RMSE <- min(ridge$results$RMSE)
+RIDGE_R2 <- max(ridge$results$Rsquared)
+
+```
+*SVM Model*
+
+Lastly, an SVM model was tested using the e1071 package and the eps-regression model type. This model produced a significant improvement to the RMSE with an RMSE of 0.74. 
 
 ```{r, include=FALSE}
 ###############################################################################
@@ -426,22 +525,41 @@ pred_elastic <- predict(elastic_model,newdata=t2)
 ###############################################################################
 SVM_model=svm(data=t1,log(totalRevenue + 1) ~ .-custId, na.action=na.pass,type="eps-regression")
 
-pred_svm = predict(SVM_model,newdata=t2,na.action=na.pass)
+
 #Find RMSE
 SVM_RMSE <- sqrt(mean((SVM_model$fitted-log(t1$totalRevenue+1))^2))
-summary(SVM_model)
 
-pred_svm = predict(SVM_model,newdata=t2,na.action=na.pass)
+#Find R2
+pred_svm = predict(SVM_model,newdata=t1,na.action=na.pass)
+SVM_R2<-cor(pred_svm,log(t1$totalRevenue+1))^2
 
-submissionDf3 <- data.frame(custId=t2$custId, predRevenue=pred_svm)
+#submissionDf3 <- data.frame(custId=t2$custId, predRevenue=pred_svm)
 #create csv file for uploading to kaggle
-write.csv(submissionDf3, "submission3.csv", row.names=FALSE)
+#write.csv(submissionDf3, "submission3.csv", row.names=FALSE)
+
 
 ```
+*Conclusion*
 
+Our modeling approach was to test a few variations of each model and from there look for models that 
+produced the best RMSE from our cleaned data. A lot of the models that were tested, were tested with trial
+and error to see how different hyperparameters would impact the RMSE values. Multiple grid techniques were used
+to test multiple hyperparameter values to achieve an optimal result. One of the main problems that occurred 
+during out model testing was the issue of run time with the SVM model. SVM produced the best result, but also
+took the longest time to compute, which made it very time consuming to trial different variations of this model.
 ```{r}
 
-summary_data <- data.frame(Model=c("OLS","PLS","elasticNet","SVM"),Method=c("lm","plsr","glmnet","svm"),Package=c("stats","pls","caret","e1071"),Hyperparameter=c("NA","ncomp",0,"cost, gamma, epsilon"),Value=c("NA",31,0,"1,0.03125,0.1"),CV_RMSE=c(OLS_RMSE,PLS_RMSE,ELASTIC_RMSE,SVM_RMSE),CV_R2=c(OLS_R2,PLS_R2,ELASTIC_R2,0))
+summary_data <- data.frame(Model=c("OLS","PLS","LASSO","elasticNet","RIDGE","SVM"),
+                           Method=c("lm","plsr","lasso","glmnet","glmnet","svm"),
+                           Package=c("stats","pls","caret","caret","caret","e1071"),
+                           Hyperparameter=c("NA","ncomp","fraction","alpha,
+                                            lambda","alpha, lambda","cost, gamma,
+                                      epsilon"),
+                           Value=c("NA",31,0.5405051,"0.9012876,0.004112218",
+                                   "0,0","1,0.03125,0.1"),
+                           CV_RMSE=c(OLS_RMSE,PLS_RMSE,LASSO_RMSE,ELASTIC_RMSE,
+                                     RIDGE_RMSE,SVM_RMSE),
+                           CV_R2=c(OLS_R2,PLS_R2,LASSO_R2,ELASTIC_R2,RIDGE_R2,SVM_R2))
 
 summary_data
 
