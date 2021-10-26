@@ -83,7 +83,7 @@ Figure 2 gives us information from a different angle, showing us the amount of r
 Overall, we can learn a lot about what different factors have high influences on the amount of revenue gained by a customer. From Figure 1, we can see that a majority of revenue is gained when the operating systems Macintosh, Chrome, Windows and Android are used. Figure 2 illustrates that Northern America is by far the sub-continent with the most revenue gained. The channel grouping also provides us with more incite on which channel groupings are used more frequently for purchases. We can also see that there variables that contain many factor levels that dont typically produce any revenue. 
 
 ii. Data Preparation
-```{r, include=TRUE, fig.height=16}
+```{r, include=TRUE, fig.height=16, fig.width=16}
 #Finding percentage of missing data in each variable
 percentagesDf = data.frame(colnames(training_data))
 for(i in 1:ncol(training_data)) {       # for-loop over columns
@@ -117,7 +117,7 @@ percentagesDf = as.data.frame(percentagesDf)
 
 *Data Preparation*
 
-1. factor selection
+**1. Factor Selection:**
 After visualizing the data set and seeing how much of each factor contains NA values, we began to select which we would keep. As a general rule any factor containing over 20
 percent of the missing information we determined to be not worth imputing as any imputation methods we would use may be inaccurate or in some cases, it would be impossible to create
 an accurate imputation i.e city. There would be no way for us to know which city they originated from nor what metro etc. We also removed information that we determined to be
@@ -170,7 +170,7 @@ testing_data = dplyr::select(testing_data,-c(adwordsClickInfo.isVideoAd,
 ))
 ```
 
-2. Imputations
+**2. Imputations:**
 Once we have decided on which factors are worth keeping we need to then impute the missing values in those factors. Many of the factors were categorical in nature meaning any
 numerical method used to impute such as mean value imputation would be out of the question. For the categorical variables such as operating system, browser and medium the imputation
 method used was a probabilistic method. Taking the occurrences of each category within the column you could create a probability distribution. When an NA is encountered randomly generate
@@ -179,7 +179,7 @@ be used, since there was no way of knowing if a visit was a new visit we would j
 value imputation and rounding down. Within the location data country, continent and subcontinent there were 84 values in which all 3 were unknown, since there was no possible way to know
 what these three could be a new level was added called unknown and they have imputed it as such.
 
-3. factor collapsing
+**3. Factor Collapsing**
 Before any modeling is done we need to deal with the fact that some categories have too many levels. subContinent, country, browser, country, and operatingSystem all have many
 levels and some of these levels may only have a few entries. For the Subcontinent continents and countries, we determined that over 50 percent of entries come from the united states,
 using factor lump we consolidated the categorical columns into two levels each. The North American Continent, the north subcontinent, and the United States. The levels for browser
@@ -263,7 +263,7 @@ percentagesDf
 ###############################################################################
 ```
 
-4. Outlier Resolution
+**4. Outlier Resolution:**
 After the initial data analysis, the revenue variable has a very significant outlier. This outlier was a value of 15980.79 and came from one single customer Id. This customer visited the site 6 times, but only made a purchase one time. In order to avoid the prediction model being skewed, the outlier was removed.
 ```{r, include=FALSE}
 ###############################################################################
@@ -282,7 +282,7 @@ training_data = training_data[training_data$revenue < 15980.79,]
 #                       END OF OUTLIER RESOLUTION                             # 
 ###############################################################################
 ```
-5. Data Aggregation
+**5. Data Aggregation:**
 After the initial data preparation, the training and testing data was aggregated to summarize the parameter variables and modify the output variable to the natural log of the total revenue plus one for each customer Id. The summarized parameters include the average page views, the maximum number of visits, the average visit gap time and the mode for the browser, operatingSystem, country and subContinent. 
 ```{r, include=FALSE}
 ###############################################################################
@@ -419,7 +419,7 @@ pred_pls
  
  Here, two different caret package train methods were tested. The first a glmnet method with K-fold cross validation with 5 folds and k=5. This produced an RMSE of 0.937, which wasn't better than our OLS or our PLS models. Next, the enet method was tested on the Elastic Net model and along with a K-fold cross validation with 5 folds and a k-value of 10. This produced a significantly worse RMSE value of 1.02 with a lambda of 0.5 and a fraction of 0.3. 
 
-```{r, indluce=FALSE}
+```{r, indluce=FALSE, results='hide'}
 
 ###############################################################################
 #                           ELASTIC NET MODEL                                 #
@@ -462,13 +462,17 @@ enetTune <- train(data=t1, log(totalRevenue + 1) ~ .-custId,
 
 plot(elastic_model)
 
-elastic_model$bestTune
+
 
 ELASTIC_RMSE<-min(elastic_model$results$RMSE)
 ELASTIC_R2 <- elastic_model$results$Rsquared[2]
 
 
 pred_elastic <- predict(elastic_model,newdata=t2)
+```
+```{r, include=FALSE}
+elastic_model$bestTune
+
 ```
 *LASSO Model*
 
@@ -545,7 +549,7 @@ and error to see how different hyperparameters would impact the RMSE values. Mul
 to test multiple hyperparameter values to achieve an optimal result. One of the main problems that occurred 
 during out model testing was the issue of run time with the SVM model. SVM produced the best result, but also
 took the longest time to compute, which made it very time consuming to trial different variations of this model.
-```{r}
+```{r, include=FALSE}
 
 summary_data <- data.frame(Model=c("OLS","PLS","LASSO","elasticNet","RIDGE","SVM"),
                            Method=c("lm","plsr","lasso","glmnet","glmnet","svm"),
@@ -557,7 +561,8 @@ summary_data <- data.frame(Model=c("OLS","PLS","LASSO","elasticNet","RIDGE","SVM
                            CV_RMSE=c(OLS_RMSE,PLS_RMSE,LASSO_RMSE,ELASTIC_RMSE,
                                      RIDGE_RMSE,SVM_RMSE),
                            CV_R2=c(OLS_R2,PLS_R2,LASSO_R2,ELASTIC_R2,RIDGE_R2,SVM_R2))
-
+```
+```{r}
 summary_data
 
 ```
