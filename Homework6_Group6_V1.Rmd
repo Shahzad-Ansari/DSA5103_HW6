@@ -264,7 +264,6 @@ percentagesDf
 ```
 
 4. Outlier Resolution
-
 After the initial data analysis, the revenue variable has a very significant outlier. This outlier was a value of 15980.79 and came from one single customer Id. This customer visited the site 6 times, but only made a purchase one time. In order to avoid the prediction model being skewed, the outlier was removed.
 ```{r, include=FALSE}
 ###############################################################################
@@ -284,7 +283,6 @@ training_data = training_data[training_data$revenue < 15980.79,]
 ###############################################################################
 ```
 5. Data Aggregation
-
 After the initial data preparation, the training and testing data was aggregated to summarize the parameter variables and modify the output variable to the natural log of the total revenue plus one for each customer Id. The summarized parameters include the average page views, the maximum number of visits, the average visit gap time and the mode for the browser, operatingSystem, country and subContinent. 
 ```{r, include=FALSE}
 ###############################################################################
@@ -552,9 +550,8 @@ took the longest time to compute, which made it very time consuming to trial dif
 summary_data <- data.frame(Model=c("OLS","PLS","LASSO","elasticNet","RIDGE","SVM"),
                            Method=c("lm","plsr","lasso","glmnet","glmnet","svm"),
                            Package=c("stats","pls","caret","caret","caret","e1071"),
-                           Hyperparameter=c("NA","ncomp","fraction","alpha,
-                                            lambda","alpha, lambda","cost, gamma,
-                                      epsilon"),
+                           Hyperparameter=c("NA","ncomp","fraction","alpha,lambda",
+                                            "alpha, lambda","cost, gamma,epsilon"),
                            Value=c("NA",31,0.5405051,"0.9012876,0.004112218",
                                    "0,0","1,0.03125,0.1"),
                            CV_RMSE=c(OLS_RMSE,PLS_RMSE,LASSO_RMSE,ELASTIC_RMSE,
